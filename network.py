@@ -70,5 +70,55 @@ def QuanDecoder():
 
 
 def QuanDiscr():
+    """
+        Loss1: fake or real will use lsgan loss
+        Loss2: four kind of classification problem will use softmax
+        Loss3: angle will use L1 loss
+    """
     # B, 3, 112, 112
     fake_image = mx.sym.var('fake_image')
+    # B, 7, 1, 1
+    # real or fake, facial hair, age, skin, gender, yaw angle, roll angle
+    label = mx.sym.var('label')
+
+    # 1. Conv(3, 64, 64)
+    conv1 = conv(fake_image, 3, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_1', use_px=False)
+    # 2. Conv(64, 32, 32)
+    conv2 = conv(conv1, 64, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_2', use_px=False)
+    # 3. Conv(128, 16, 16)
+    conv3 = conv(conv2, 128, kernel=(3, 3), stride=(2, 2), slope=0.2, name = 'discr1_3', use_px = False)
+    # --------
+    # Loss 2
+    # --------
+    # 4. Conv(256, 8, 8)
+    conv4 = conv(conv3, 256, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_4', use_px=False)
+    # 5. Conv(512, 4, 4)
+    out = conv(conv4, 512, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_5', use_px=False)
+    # --------
+    # Loss 1 and Loss 3
+    # --------
+
+def QuanLossModule():
+    """
+        Model Trainable
+
+        Loss 4 : MSE(L2) of vector (Reconstruction Loss)
+        Loss 5 : MAE(L1) of image (Semantic Consistency Loss)
+    """
+    real_vector = mx.sym.var('real_vector')
+    fake_vector = mx.sym.var('fake_vector')
+    real_image = mx.sym.var('real_image')
+    fake_image = mx.sym.var('fake_image')
+
+    # Loss 4
+    loss4 = mx.sym.mean(mx.sym.sqrt(mx.sym.sum(mx.sym.square(mx.sym.elemwise_sub(real_vector, fake_vector)), axis=1)))
+    # Loss 5
+    loss5 = mx.sym.mean(mx.sym.sum(mx.sym.abs(mx.sym.elemwise_sub(real_image, fake_image)), axis=1))
+
+    loss = loss4 + loss5
+    return mx.sym.MakeLoss(loss)
+
+
+
+
+
