@@ -2,5 +2,6 @@
 
 
 * ~~1. Network~~
-* DataIter
+* ~~2. DataIter~~
+* Accelerate
 * Train
