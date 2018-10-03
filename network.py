@@ -86,7 +86,7 @@ def QuanDiscr():
     # 2. Conv(64, 32, 32)
     conv2 = conv(conv1, 64, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_2', use_px=False)
     # 3. Conv(128, 16, 16)
-    conv3 = conv(conv2, 128, kernel=(3, 3), stride=(2, 2), slope=0.2, name = 'discr1_3', use_px = False)
+    conv3 = conv(conv2, 128, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_3', use_px=False)
     # --------
     # Loss 2
     # --------
@@ -97,6 +97,7 @@ def QuanDiscr():
     # --------
     # Loss 1 and Loss 3
     # --------
+
 
 def QuanLossModule():
     """
@@ -115,10 +116,5 @@ def QuanLossModule():
     # Loss 5
     loss5 = mx.sym.mean(mx.sym.sum(mx.sym.abs(mx.sym.elemwise_sub(real_image, fake_image)), axis=1))
 
-    loss = loss4 + loss5
+    loss = mx.sym.elemwise_add(loss4, loss5)
     return mx.sym.MakeLoss(loss)
-
-
-
-
-
