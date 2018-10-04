@@ -15,7 +15,7 @@ def QuanDecoder():
     roll_vector = mapping(embedding, 512, 'roll_mapping')
     # 系数可考虑
     yaw_vector = mx.sym.broadcast_mul(angle.slice_axis(axis=1, begin=0, end=1), yaw_vector)
-    roll_vector= mx.sym.broadcast_mul(angle.slice_axis(axis=1, begin=1, end=2), roll_vector)
+    roll_vector = mx.sym.broadcast_mul(angle.slice_axis(axis=1, begin=1, end=2), roll_vector)
     vector = yaw_vector + roll_vector + embedding
     vector = mx.sym.reshape(vector, shape=(0, 0, 1, 1), name='vector_reshape')  # B, 512, 1, 1
     # 1. Deconv (B, 512, 7, 7)
@@ -62,7 +62,7 @@ def QuanLoss():
     # Loss 5
     loss5 = mx.sym.mean(mx.sym.sum(mx.sym.abs(mx.sym.elemwise_sub(real_image, fake_image)), axis=1))
 
-    return mx.sym.MakeLoss(loss4 + loss5)
+    return mx.sym.MakeLoss(loss4 + loss5, name='DecoderLoss')
 
 
 def QuanDiscr():
@@ -115,11 +115,11 @@ def QuanDiscr():
     loss1 = binary_cross_entropy(out1, gan_label)
     loss3 = mae_loss(out2, angle_lable)
     # --------
-    return mx.sym.MakeLoss(loss1 + loss2 + loss3)
+    return mx.sym.MakeLoss(loss1 + loss2 + loss3, name='DLoss')
 
 
 if __name__ == '__main__':
     # print(QuanDecoder().infer_shape(embedding_vector=(10, 512), decoder_label=(10, 4), angle=(10, 2)))
     # print(QuanDiscr().infer_shape(fake_image=(10, 3, 112, 112), gan_label=(10, 1), cls_label=(10, 18), angle_label=(10, 2)))
-    print(QuanLoss().infer_shape(real_vector=(10, 512), fake_vector=(10, 512), real_image=(10, 3, 112, 112), fake_image=(10, 3, 112, 112)))
-
+    print(QuanLoss().infer_shape(real_vector=(10, 512), fake_vector=(10, 512), real_image=(10, 3, 112, 112),
+                                 fake_image=(10, 3, 112, 112)))
