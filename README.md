@@ -4,7 +4,7 @@
 * ~~1. Network~~
 * ~~2. DataIter~~
 * ~~3. Accelerate~~
-* 4. 循环
-* Loss
+* ~~4. loss~~
+* 循环
 * record
 * Train

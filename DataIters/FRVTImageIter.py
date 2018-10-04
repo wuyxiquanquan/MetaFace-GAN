@@ -53,7 +53,7 @@ class FRVTImageIter(mx.io.DataIter):
             imgs[0][i] = self.read_image(self.cur)
             labels[0][i] = self.dataset.FACIAL_HAIR[self.cur]
             labels[1][i] = self.dataset.AGE[self.cur]
-            labels[2][i] = self.dataset.SKINTONE[self.cur]
+            labels[2][i] = self.dataset.SKINTONE[self.cur] - 1
             labels[2][i] = self.dataset.GENDER[self.cur]
             labels[4][i] = self.dataset.YAW[self.cur]
             labels[5][i] = self.dataset.ROLL[self.cur]
