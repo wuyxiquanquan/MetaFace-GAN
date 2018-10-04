@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 import mxnet as mx
-from network.unit import *
+from unit import *
 
 
 def QuanDecoder():
@@ -14,9 +14,9 @@ def QuanDecoder():
     yaw_vector = mapping(embedding, 512, 'yaw_mapping')  # B, 512
     roll_vector = mapping(embedding, 512, 'roll_mapping')
     # 系数可考虑
-    pose_vector = mx.sym.broadcast_mul(angle.slice_axis(axis=1, begin=0, end=1), yaw_vector) + mx.sym.broadcast_mul(
-        angle.slice_axis(axis=1, begin=1, end=2), roll_vector)
-    vector = mx.sym.elemwise_add(embedding, pose_vector, name='vector_add')
+    yaw_vector = mx.sym.broadcast_mul(angle.slice_axis(axis=1, begin=0, end=1), yaw_vector)
+    roll_vector= mx.sym.broadcast_mul(angle.slice_axis(axis=1, begin=1, end=2), roll_vector)
+    vector = yaw_vector + roll_vector + embedding
     vector = mx.sym.reshape(vector, shape=(0, 0, 1, 1), name='vector_reshape')  # B, 512, 1, 1
     # 1. Deconv (B, 512, 7, 7)
     deconv1 = mx.sym.Deconvolution(vector, kernel=(7, 7), num_filter=512, no_bias=True, name='decoder_deconv1')
@@ -38,7 +38,7 @@ def QuanDecoder():
     conv6 = conv(px5, 7, kernel=(5, 5), name='decoder_6', slope=0.2, use_px=False)
     # all label mask (B, 1, 112, 112)
     mask = mx.sym.sum(conv6.slice_axis(axis=1, begin=0, end=4), axis=1, keepdims=True)
-    out = mx.sym.broadcast_mul(conv6.slice_axis(axis=1, begin=4, end=7), mask, name='attention')  # B, 3, 112, 112
+    out = mx.sym.broadcast_mul(conv6.slice_axis(axis=1, begin=4, end=7), mask, name='attention_mul')  # B, 3, 112, 112
 
     return out
 
@@ -109,7 +109,7 @@ def QuanDiscr():
     conv5 = conv(conv4, 512, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_5', use_px=False)
     # 6. Conv(3, 4, 4)
     out1 = mx.sym.Convolution(conv5, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_filter=1, name='discri1_out1')
-    out2 = mx.sym.Convolution(conv5, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_filter=2, name='discri1_out1')
+    out2 = mx.sym.Convolution(conv5, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_filter=2, name='discri1_out2')
     # --------
     # Loss 1 and Loss 3
     loss1 = binary_cross_entropy(out1, gan_label)
@@ -121,5 +121,5 @@ def QuanDiscr():
 if __name__ == '__main__':
     # print(QuanDecoder().infer_shape(embedding_vector=(10, 512), decoder_label=(10, 4), angle=(10, 2)))
     # print(QuanDiscr().infer_shape(fake_image=(10, 3, 112, 112), gan_label=(10, 1), cls_label=(10, 18), angle_label=(10, 2)))
-    print(QuanLoss().infer_shape(real_vector=(10, 512), fake_vector=(10, 512), real_image=(10, 3, 112, 112),
-                                 fake_image=(10, 3, 112, 112)))
+    print(QuanLoss().infer_shape(real_vector=(10, 512), fake_vector=(10, 512), real_image=(10, 3, 112, 112), fake_image=(10, 3, 112, 112)))
+
