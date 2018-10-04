@@ -19,13 +19,17 @@ class FRVTImageIter(mx.io.DataIter):
             ('Row', (batch_size,)),
         ]
 
-    def __len__(self):
-        return len(self.dataset)
+    def read_image(self, i):
 
-    def read_image(self, path):
-        path = '/data1/ijb/IJB/IJB-C/images/' + path
-        img = cv2.imread(path)[:, :, ::-1]
-        img = cv2.resize(img, (112, 112))
+        path = '/data1/ijb/IJB/IJB-C/images/' + self.dataset.FILENAME[i]
+        y, x = int(self.dataset.FACE_Y[i]), int(self.dataset.FACE_X[i])
+        h, w = int(self.dataset.FACE_HEIGHT[i]), int(self.dataset.FACE_WIDTH[i])
+        center_y = h // 2 + y
+        center_x = w // 2 + x
+        big = max(h, w) // 2
+        y_ = y if center_y - big < 0 else center_y - big
+        x_ = x if center_x - big < 0 else center_x - big
+        img = cv2.resize(cv2.imread(path)[y_: center_y + big, x_: center_x + big, ::-1], (112, 112))
         img = mx.nd.array(img).transpose(axes=(2, 0, 1))
         return img
 
@@ -39,17 +43,21 @@ class FRVTImageIter(mx.io.DataIter):
             image, label
         """
         imgs = [mx.nd.zeros((self.batch_size, 3, 112, 112))]
-        label = mx.nd.zeros((self.batch_size,))
-        labels = [label] * 6
-        for i in range(self.batch_size):
+        labels = [mx.nd.zeros((self.batch_size,))] * 6
+        i = 0
+        while i < 8:
             self.cur += 1
-            imgs[0][i] = self.read_image(self.dataset.FILENAME[self.cur + 1])
-            labels[0][i] = self.dataset.FACIAL_HAIR[self.cur + i]
-            labels[1][i] = self.dataset.AGE[self.cur + i]
-            labels[2][i] = self.dataset.SKINTONE[self.cur + i]
-            labels[2][i] = self.dataset.GENDER[self.cur + i]
-            labels[4][i] = self.dataset.YAW[self.cur + i]
-            labels[5][i] = self.dataset.ROLL[self.cur + i]
+            if self.dataset.FILENAME[self.cur].split('/')[0] == 'frames' or self.dataset.FACE_HEIGHT[self.cur] < 100 or \
+                    self.dataset.FACE_WIDTH[self.cur] < 100:
+                continue
+            imgs[0][i] = self.read_image(self.cur)
+            labels[0][i] = self.dataset.FACIAL_HAIR[self.cur]
+            labels[1][i] = self.dataset.AGE[self.cur]
+            labels[2][i] = self.dataset.SKINTONE[self.cur]
+            labels[2][i] = self.dataset.GENDER[self.cur]
+            labels[4][i] = self.dataset.YAW[self.cur]
+            labels[5][i] = self.dataset.ROLL[self.cur]
+            i += 1
 
         return mx.io.DataBatch(imgs, labels, )
 
@@ -58,7 +66,6 @@ if __name__ == '__main__':
 
     train_dataiter = FRVTImageIter(10, '/data1/ijb/IJB/IJB-C/protocols/ijbc_metadata.csv')
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)
-    from tqdm import tqdm
 
-    for i, data in enumerate(tqdm(train_dataiter)):
-        continue
+    for i, data in enumerate(train_dataiter):
+        break
