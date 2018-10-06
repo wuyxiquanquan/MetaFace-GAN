@@ -70,8 +70,8 @@ def QuanDiscr():
     input:
             fake_image : (B, 3, 112, 112)
             gan_label  : (B, 1, )
-            cls_lable  : (B, 18, 1, 1)    real or fake, facial hair, age, skin, gender, yaw angle, roll angle
-            angle_label: (B, 2, )                             4       6     6     2
+            cls_lable  : (B, 18,)      real or fake, facial hair, age, skin, gender, yaw angle, roll angle
+            angle_label: (B, 2, )                         4       6     6     2
     loss:
         Loss1: fake or real will use gan loss
         Loss2: four kind of classification problem will use lsgan
@@ -87,7 +87,7 @@ def QuanDiscr():
     gan_label = mx.sym.var('gan_label').reshape((0, 0, 1, 1))
 
     # B, 18
-    cls_label = mx.sym.var('cls_label').reshape(shape=(0, 0, 1, 1), name='cls_label_shape').reshape((0, 0, 1, 1))
+    cls_label = mx.sym.var('cls_label').reshape(shape=(0, 0, 1, 1))
 
     # B, 2
     angle_lable = mx.sym.var('angle_label').reshape((0, 0, 1, 1))

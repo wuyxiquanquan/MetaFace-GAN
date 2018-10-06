@@ -6,6 +6,6 @@
 * ~~3. Accelerate~~
 * ~~4. loss~~
 * ~~5. FRVTDataIter bug~~
-* 创建module
+* ~~6. 建module~~
 * train
 * record
