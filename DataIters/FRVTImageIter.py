@@ -47,12 +47,13 @@ class FRVTImageIter(mx.io.DataIter):
                          mx.nd.zeros((self.batch_size, 6))]
 
         i = 0
-        while i < 8:
+        while i < self.batch_size:
             self.cur += 1
             if self.dataset.FILENAME[self.cur].split('/')[0] == 'frames' or self.dataset.FACE_HEIGHT[self.cur] < 100 or \
                     self.dataset.FACE_WIDTH[self.cur] < 100 or isnan(self.dataset.FACIAL_HAIR[self.cur]) or isnan(
                 self.dataset.AGE[self.cur]) or isnan(self.dataset.SKINTONE[self.cur]) or isnan(
-                self.dataset.GENDER[self.cur]):
+                self.dataset.GENDER[self.cur]) or isnan(self.dataset.ROLL[self.cur]) or isnan(
+                self.dataset.YAW[self.cur]) or self.dataset.AGE[self.cur] == 0:
                 continue
             combined_data[0][i] = self.read_image(self.cur)
             combined_data[1][i][0] = self.dataset.FACIAL_HAIR[self.cur]

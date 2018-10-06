@@ -1,15 +1,15 @@
 # -*- coding:utf-8 -*-
 import mxnet as mx
-from unit import *
+from network.unit import *
 
 
 def QuanDecoder():
     # B, 512
-    embedding = mx.sym.var('embedding_vector')
+    embedding = mx.sym.var('decoder_real_vector')
     # label [Hair, Age, Skin, Gender] B, 4
-    label = mx.sym.var('decoder_label')
+    label = mx.sym.var('decoder_cls_label')
     # angle [yaw, roll] B, 2
-    angle = mx.sym.var('angle')
+    angle = mx.sym.var('decoder_angle_label')
     # Mapping for yaw and roll
     yaw_vector = mapping(embedding, 512, 'yaw_mapping')  # B, 512
     roll_vector = mapping(embedding, 512, 'roll_mapping')
@@ -43,6 +43,59 @@ def QuanDecoder():
     return out
 
 
+def QuanDiscr():
+    """
+    input:
+            fake_image : (B, 3, 112, 112)
+            gan_label  : (B, 1, )
+            cls_lable  : (B, 17,)      real or fake, facial hair, age, skin, gender, yaw angle, roll angle
+            angle_label: (B, 2, )                         4       6     6     2
+    loss:
+        Loss1: fake or real will use gan loss
+        Loss2: four kind of classification problem will use lsgan
+        Loss3: angle will use L1 loss (MAE)
+
+    """
+    # B, 3, 112, 112
+    fake_image = mx.sym.var('discri_image')
+    # real or fake, facial hair, age, skin, gender, yaw angle, roll angle
+    #                     4       5     6     2
+
+    # B, 1
+    gan_label = mx.sym.var('discri_gan_label').reshape((0, 0, 1, 1))
+
+    # B, 17
+    cls_label = mx.sym.var('discri_cls_label').reshape(shape=(0, 0, 1, 1))
+
+    # B, 2
+    angle_lable = mx.sym.var('discri_angle_label').reshape((0, 0, 1, 1))
+
+    # 1. Conv(3, 64, 64)
+    conv1 = conv(fake_image, 3, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_1', use_px=False)
+    # 2. Conv(64, 32, 32)
+    conv2 = conv(conv1, 64, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_2', use_px=False)
+    # 3. Conv(128, 16, 16)
+    conv3 = conv(conv2, 128, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_3', use_px=False)
+    # --------
+    # Loss 2
+    branch1 = conv(conv3, 17, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_branch_1', use_px=False)
+    loss2 = lsgan_loss(branch1, cls_label)
+    # --------
+    # 4. Conv(256, 8, 8)
+    conv4 = conv(conv3, 256, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_4', use_px=False)
+    # 5. Conv(512, 4, 4)
+    conv5 = conv(conv4, 512, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_5', use_px=False)
+    # 6. Conv(3, 4, 4)
+    out1 = mx.sym.Convolution(conv5, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_filter=1, name='discri1_out1')
+    out2 = mx.sym.Convolution(conv5, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_filter=2, name='discri1_out2')
+    # --------
+    # Loss 1 and Loss 3
+    loss1 = binary_cross_entropy(out1, gan_label)
+    loss3 = mae_loss(out2, angle_lable)
+    # --------
+    return mx.sym.MakeLoss(loss1 + loss2 + loss3, name='DLoss')
+
+
 def QuanLoss():
     """
         Model Trainable
@@ -65,61 +118,8 @@ def QuanLoss():
     return mx.sym.MakeLoss(loss4 + loss5, name='DecoderLoss')
 
 
-def QuanDiscr():
-    """
-    input:
-            fake_image : (B, 3, 112, 112)
-            gan_label  : (B, 1, )
-            cls_lable  : (B, 18,)      real or fake, facial hair, age, skin, gender, yaw angle, roll angle
-            angle_label: (B, 2, )                         4       6     6     2
-    loss:
-        Loss1: fake or real will use gan loss
-        Loss2: four kind of classification problem will use lsgan
-        Loss3: angle will use L1 loss (MAE)
-
-    """
-    # B, 3, 112, 112
-    fake_image = mx.sym.var('fake_image')
-    # real or fake, facial hair, age, skin, gender, yaw angle, roll angle
-    #                     4       6     6     2
-
-    # B, 1
-    gan_label = mx.sym.var('gan_label').reshape((0, 0, 1, 1))
-
-    # B, 18
-    cls_label = mx.sym.var('cls_label').reshape(shape=(0, 0, 1, 1))
-
-    # B, 2
-    angle_lable = mx.sym.var('angle_label').reshape((0, 0, 1, 1))
-
-    # 1. Conv(3, 64, 64)
-    conv1 = conv(fake_image, 3, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_1', use_px=False)
-    # 2. Conv(64, 32, 32)
-    conv2 = conv(conv1, 64, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_2', use_px=False)
-    # 3. Conv(128, 16, 16)
-    conv3 = conv(conv2, 128, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_3', use_px=False)
-    # --------
-    # Loss 2
-    branch1 = conv(conv3, 18, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_branch_1', use_px=False)
-    loss2 = lsgan_loss(branch1, cls_label)
-    # --------
-    # 4. Conv(256, 8, 8)
-    conv4 = conv(conv3, 256, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_4', use_px=False)
-    # 5. Conv(512, 4, 4)
-    conv5 = conv(conv4, 512, kernel=(3, 3), stride=(2, 2), slope=0.2, name='discr1_5', use_px=False)
-    # 6. Conv(3, 4, 4)
-    out1 = mx.sym.Convolution(conv5, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_filter=1, name='discri1_out1')
-    out2 = mx.sym.Convolution(conv5, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_filter=2, name='discri1_out2')
-    # --------
-    # Loss 1 and Loss 3
-    loss1 = binary_cross_entropy(out1, gan_label)
-    loss3 = mae_loss(out2, angle_lable)
-    # --------
-    return mx.sym.MakeLoss(loss1 + loss2 + loss3, name='DLoss')
-
-
 if __name__ == '__main__':
     # print(QuanDecoder().infer_shape(embedding_vector=(10, 512), decoder_label=(10, 4), angle=(10, 2)))
-    # print(QuanDiscr().infer_shape(fake_image=(10, 3, 112, 112), gan_label=(10, 1), cls_label=(10, 18), angle_label=(10, 2)))
+    # print(QuanDiscr().infer_shape(fake_image=(10, 3, 112, 112), gan_label=(10, 1), cls_label=(10, 17), angle_label=(10, 2)))
     print(QuanLoss().infer_shape(real_vector=(10, 512), fake_vector=(10, 512), real_image=(10, 3, 112, 112),
                                  fake_image=(10, 3, 112, 112)))
