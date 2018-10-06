@@ -3,8 +3,8 @@ import mxnet as mx
 
 def fc(data, num_hidden, name):
     fc1 = mx.sym.FullyConnected(data, num_hidden=num_hidden, no_bias=True, name=name + '_fc')
-    IN = mx.sym.InstanceNorm(fc1, name=name + '_IN')
-    out = mx.sym.Activation(IN, act_type='relu', name=name + '_relu')
+    fc_IN = mx.sym.InstanceNorm(fc1, name=name + '_IN')
+    out = mx.sym.Activation(fc_IN, act_type='relu', name=name + '_relu')
     return out
 
 

@@ -1,6 +1,7 @@
 import mxnet as mx
 from pandas import read_csv
 import cv2
+from math import isnan
 
 
 class FRVTImageIter(mx.io.DataIter):
@@ -36,30 +37,32 @@ class FRVTImageIter(mx.io.DataIter):
     def reset(self):
         """Resets the iterator to the beginning of the data."""
         self.cur = -1
-        print('IJB-C dataset loading is complete!')
+        print('IJB-C dataset resetting is complete!')
 
     def next(self):
         """
-            image, label
+            data: [(B, 3, 112, 112), (B, 6)]
         """
-        imgs = [mx.nd.zeros((self.batch_size, 3, 112, 112))]
-        labels = [mx.nd.zeros((self.batch_size,))] * 6
+        combined_data = [mx.nd.zeros((self.batch_size, 3, 112, 112), dtype='int32'),
+                         mx.nd.zeros((self.batch_size, 6))]
+
         i = 0
         while i < 8:
             self.cur += 1
             if self.dataset.FILENAME[self.cur].split('/')[0] == 'frames' or self.dataset.FACE_HEIGHT[self.cur] < 100 or \
-                    self.dataset.FACE_WIDTH[self.cur] < 100:
+                    self.dataset.FACE_WIDTH[self.cur] < 100 or isnan(self.dataset.FACIAL_HAIR[self.cur]) or isnan(
+                self.dataset.AGE[self.cur]) or isnan(self.dataset.SKINTONE[self.cur]) or isnan(
+                self.dataset.GENDER[self.cur]):
                 continue
-            imgs[0][i] = self.read_image(self.cur)
-            labels[0][i] = self.dataset.FACIAL_HAIR[self.cur]
-            labels[1][i] = self.dataset.AGE[self.cur]
-            labels[2][i] = self.dataset.SKINTONE[self.cur] - 1
-            labels[2][i] = self.dataset.GENDER[self.cur]
-            labels[4][i] = self.dataset.YAW[self.cur]
-            labels[5][i] = self.dataset.ROLL[self.cur]
+            combined_data[0][i] = self.read_image(self.cur)
+            combined_data[1][i][0] = self.dataset.FACIAL_HAIR[self.cur]
+            combined_data[1][i][1] = self.dataset.AGE[self.cur]
+            combined_data[1][i][2] = self.dataset.SKINTONE[self.cur] - 1
+            combined_data[1][i][3] = self.dataset.GENDER[self.cur]
+            combined_data[1][i][4] = self.dataset.YAW[self.cur]
+            combined_data[1][i][5] = self.dataset.ROLL[self.cur]
             i += 1
-
-        return mx.io.DataBatch(imgs, labels, )
+        return mx.io.DataBatch(combined_data, [], )
 
 
 if __name__ == '__main__':
