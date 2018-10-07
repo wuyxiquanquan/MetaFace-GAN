@@ -46,10 +46,10 @@ def QuanDecoder():
 def QuanDiscr():
     """
     input:
-            fake_image : (B, 3, 112, 112)
-            gan_label  : (B, 1, )
-            cls_lable  : (B, 17,)      real or fake, facial hair, age, skin, gender, yaw angle, roll angle
-            angle_label: (B, 2, )                         4       6     6     2
+            discri_image : (B, 3, 112, 112)
+            discri_gan_label  : (B, 1, )
+            discri_cls_label  : (B, 17,)      real or fake, facial hair, age, skin, gender, yaw angle, roll angle
+            discri_angle_label: (B, 2, )                          4       5     6     2
     loss:
         Loss1: fake or real will use gan loss
         Loss2: four kind of classification problem will use lsgan
