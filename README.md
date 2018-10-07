@@ -7,5 +7,6 @@
 * ~~4. loss~~
 * ~~5. FRVTDataIter bug~~
 * ~~6. 建module~~
-* train
+* ~~7. train~~
+* blockgrad去掉
 * record

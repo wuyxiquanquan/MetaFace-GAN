@@ -7,10 +7,10 @@ from tqdm import tqdm
 import time
 import numpy as np
 from mxnet.io import DataBatch
+
 np.set_printoptions(suppress=True)
 
 batch_size = 100
-
 # --------- multicard ---------
 ctx = []
 
@@ -27,8 +27,8 @@ def label_broad(labels):
 
 
 # cvd = os.environ['CUDA_VISIBLE_DEVICES'].strip()
-# cvd = '0,1,2,3,4,5,6,7'
-cvd = ''
+cvd = '0,1,2,3,4,5,6,7'
+# cvd = ''
 if len(cvd) > 0:
     for i in range(len(cvd.split(','))):
         ctx.append(mx.gpu(i))
@@ -85,36 +85,27 @@ loss_module.bind(data_shapes=[('real_vector', (batch_size, 512)), ('fake_vector'
                               ('real_image', (batch_size, 3, 112, 112)), ('fake_image', (batch_size, 3, 112, 112))],
                  label_shapes=None,
                  for_training=True, inputs_need_grad=True)
+loss_module.init_params(initializer=mx.init.Xavier(),
+                        allow_missing=True)
 
 # --------- fixed FR net ---------
 fr_module = mx.module.Module.load('/home/wuyuxiang/quan/insightface/model_params/theBest', 0,
                                   data_names=['data', ], label_names=None,
                                   context=ctx, )
 fr_module.bind([('data', (batch_size, 3, 112, 112))], None, for_training=True, inputs_need_grad=True)
+fr_module.init_optimizer(optimizer='adam',
+                         optimizer_params={
+                             'learning_rate': 1e-4,
+                             'beta1': 0.5,
+                         })
 
 train_dataiter = FRVTImageIter(batch_size, '/data1/ijb/IJB/IJB-C/protocols/ijbc_metadata.csv')
 train_dataiter = mx.io.PrefetchingIter(train_dataiter)
-'''
-        input:                      size:                      
-            data                            [B, 3, 112, 112]                
-            
-            decoder_real_vector             [B, 512]                        
-            decoder_cls_label               [B, 4]
-            decoder_angle_label             [B, 2]
-            
-            discri_image                    [B, 3, 112, 112]
-            discri_gan_label                [B, 1]
-            discri_cls_label                [B, 17]
-            discri_angle_label              [B, 2]
-            
-            real_vector                     [B, 512]
-            fake_vector                     [B, 512]
-            real_image                      [B, 3, 112, 112]
-            fake_image                      [B, 3, 112, 112]
-'''
+
+# training
 for epoch in range(1):
     train_dataiter.reset()
-    for cur_time, databatch in enumerate((train_dataiter)):
+    for cur_time, databatch in enumerate(tqdm(train_dataiter)):
         real_image, labels = databatch.data
         # print(labels.asnumpy())
         # time.sleep(1)
@@ -122,29 +113,60 @@ for epoch in range(1):
         #                             1. Train the discriminator                              #
         # =================================================================================== #
         # discriminator data preparing
-        # fake_image
-        fr_module.forward(DataBatch([real_image]), is_train=False)
-        real_vector = fr_module.get_outputs(merge_multi_context=True)[0]
+        fr_module.forward(DataBatch([real_image], None), is_train=False)
+        real_vector = fr_module.get_outputs()[0]
         decoder.forward(DataBatch([real_vector, labels[:, 0:4], labels[:, 4:6]], None), is_train=True)
         fake_image = decoder.get_outputs()[0]
         discri_cls_label = label_broad(labels[:, 0:4])
         discri_angle_label = labels[:, 4:6]
-
+        # update
         # collect fake's grad
-        discri.forward(DataBatch([fake_image, mx.nd.zeros((batch_size, 1)), discri_cls_label, discri_angle_label]), is_train=True)
+        discri.forward(
+            DataBatch([fake_image, mx.nd.zeros((batch_size, 1)), discri_cls_label, discri_angle_label], None),
+            is_train=True)
+        loss1 = discri.get_outputs()[0]
         discri.backward()
         gradDiscri = [[grad.copyto(grad.context) for grad in grads] for grads in discri._exec_group.grad_arrays]
         # collect real's grad
-        discri.forward(DataBatch([real_image, mx.nd.ones((batch_size, 1)), discri_cls_label, discri_angle_label]), is_train=True)
+        discri.forward(DataBatch([real_image, mx.nd.ones((batch_size, 1)), discri_cls_label, discri_angle_label], None),
+                       is_train=True)
         discri.backward()
         for gradsr, gradsf in zip(discri._exec_group.grad_arrays, gradDiscri):
             for gradr, gradf in zip(gradsr, gradsf):
                 gradr += gradf
         discri.update()
-        break
         # =================================================================================== #
         #                                 2. Train the decoder                                #
         # =================================================================================== #
+        # decoder data preparing
+        decoder_real_vector = real_vector
+        decoder_cls_label = labels[:, 0:4]
+        decoder_angle_label = labels[:, 4:6]
+        fr_module.forward(DataBatch([fake_image], None), is_train=True)
+        fake_vector = fr_module.get_outputs()[0]
+        # loss_mdoule
+        loss_module.forward(DataBatch([real_vector, fake_vector, real_image, fake_image], None), is_train=True)
+        loss2 = loss_module.get_outputs()[0]
+        loss_module.backward()
+        backward_grad = loss_module.get_input_grads()
+        #   fake_image
+        decoder.backward(backward_grad[3:])
+        gradDecoder = [[grad.copyto(grad.context) for grad in grads] for grads in decoder._exec_group.grad_arrays]
+        fr_module.backward(backward_grad[1:2])
+        decoder.backward(fr_module.get_input_grads())
+        for gradsr, gradsf in zip(decoder._exec_group.grad_arrays, gradDecoder):
+            for gradr, gradf in zip(gradsr, gradsf):
+                gradf += gradr
+        # discri
+        discri.forward(DataBatch([fake_image, mx.nd.ones((batch_size, 1)), discri_cls_label, discri_angle_label], None),
+                       is_train=True)
+        discri.backward()
+        decoder.backward(discri.get_input_grads()[0:1])
+        for gradsr, gradsf in zip(decoder._exec_group.grad_arrays, gradDecoder):
+            for gradr, gradf in zip(gradsr, gradsf):
+                gradr += gradf
+        decoder.update()
         # =================================================================================== #
         #                                 3. Miscellaneous                                    #
         # =================================================================================== #
+        loss = loss1 + loss2
