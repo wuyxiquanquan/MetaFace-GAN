@@ -13,7 +13,10 @@ np.set_printoptions(suppress=True)
 batch_size = 100
 # --------- multicard ---------
 ctx = []
-
+# cvd = os.environ['CUDA_VISIBLE_DEVICES'].strip()
+cvd = '0,1,2,3,4,5,6,7'
+batch_size = 100 * 8
+# cvd = ''
 
 def label_broad(labels):
     # labels [B, 4]
@@ -26,9 +29,6 @@ def label_broad(labels):
     return temp
 
 
-# cvd = os.environ['CUDA_VISIBLE_DEVICES'].strip()
-cvd = '0,1,2,3,4,5,6,7'
-# cvd = ''
 if len(cvd) > 0:
     for i in range(len(cvd.split(','))):
         ctx.append(mx.gpu(i))
@@ -37,6 +37,7 @@ if len(ctx) == 0:
     print('use CPU')
 else:
     print('GPU num:', len(ctx))
+
 # -----create Module----
 # 1. Module
 # 2. bind
@@ -97,13 +98,14 @@ fr_module.init_optimizer(optimizer='adam',
                          optimizer_params={
                              'learning_rate': 1e-4,
                              'beta1': 0.5,
+
                          })
 
 train_dataiter = FRVTImageIter(batch_size, '/data1/ijb/IJB/IJB-C/protocols/ijbc_metadata.csv')
 train_dataiter = mx.io.PrefetchingIter(train_dataiter)
 
 # training
-for epoch in range(1):
+for epoch in range(2):
     train_dataiter.reset()
     for cur_time, databatch in enumerate(tqdm(train_dataiter)):
         real_image, labels = databatch.data
@@ -170,3 +172,4 @@ for epoch in range(1):
         #                                 3. Miscellaneous                                    #
         # =================================================================================== #
         loss = loss1 + loss2
+        # print(loss)

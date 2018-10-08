@@ -20,6 +20,9 @@ class FRVTImageIter(mx.io.DataIter):
             ('Row', (batch_size,)),
         ]
 
+    def __len__(self):
+        return 61575
+
     def read_image(self, i):
 
         path = '/data1/ijb/IJB/IJB-C/images/' + self.dataset.FILENAME[i]
@@ -47,23 +50,30 @@ class FRVTImageIter(mx.io.DataIter):
                          mx.nd.zeros((self.batch_size, 6))]
 
         i = 0
-        while i < self.batch_size:
-            self.cur += 1
-            if self.dataset.FILENAME[self.cur].split('/')[0] == 'frames' or self.dataset.FACE_HEIGHT[self.cur] < 100 or \
-                    self.dataset.FACE_WIDTH[self.cur] < 100 or isnan(self.dataset.FACIAL_HAIR[self.cur]) or isnan(
-                self.dataset.AGE[self.cur]) or isnan(self.dataset.SKINTONE[self.cur]) or isnan(
-                self.dataset.GENDER[self.cur]) or isnan(self.dataset.ROLL[self.cur]) or isnan(
-                self.dataset.YAW[self.cur]) or self.dataset.AGE[self.cur] == 0:
-                continue
-            combined_data[0][i] = self.read_image(self.cur)
-            combined_data[1][i][0] = self.dataset.FACIAL_HAIR[self.cur]
-            combined_data[1][i][1] = self.dataset.AGE[self.cur]
-            combined_data[1][i][2] = self.dataset.SKINTONE[self.cur] - 1
-            combined_data[1][i][3] = self.dataset.GENDER[self.cur]
-            combined_data[1][i][4] = self.dataset.YAW[self.cur]
-            combined_data[1][i][5] = self.dataset.ROLL[self.cur]
-            i += 1
-        return mx.io.DataBatch(combined_data, [], )
+        try:
+            while i < self.batch_size:
+                self.cur += 1
+                if self.cur == 163359:
+                    return mx.io.DataBatch(combined_data, [], self.batch_size - i)
+                if self.dataset.FILENAME[self.cur].split('/')[0] == 'frames' or self.dataset.FACE_HEIGHT[self.cur] < 100 or \
+                        self.dataset.FACE_WIDTH[self.cur] < 100 or isnan(self.dataset.FACIAL_HAIR[self.cur]) or isnan(
+                    self.dataset.AGE[self.cur]) or isnan(self.dataset.SKINTONE[self.cur]) or isnan(
+                    self.dataset.GENDER[self.cur]) or isnan(self.dataset.ROLL[self.cur]) or isnan(
+                    self.dataset.YAW[self.cur]) or self.dataset.AGE[self.cur] == 0:
+                    continue
+                combined_data[0][i] = self.read_image(self.cur)
+                combined_data[1][i][0] = self.dataset.FACIAL_HAIR[self.cur]
+                combined_data[1][i][1] = self.dataset.AGE[self.cur]
+                combined_data[1][i][2] = self.dataset.SKINTONE[self.cur] - 1
+                combined_data[1][i][3] = self.dataset.GENDER[self.cur]
+                combined_data[1][i][4] = self.dataset.YAW[self.cur]
+                combined_data[1][i][5] = self.dataset.ROLL[self.cur]
+                i += 1
+            return mx.io.DataBatch(combined_data, [], self.batch_size - i)
+        except StopIteration:
+            if i < self.batch_size:
+                raise StopIteration
+
 
 
 if __name__ == '__main__':

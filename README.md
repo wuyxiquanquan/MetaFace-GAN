@@ -8,5 +8,7 @@
 * ~~5. FRVTDataIter bug~~
 * ~~6. 建module~~
 * ~~7. train~~
-* blockgrad去掉
+* ~~8. blockgrad去掉~~
+* ~~9. 图片数目~~
+* arg完善
 * record
