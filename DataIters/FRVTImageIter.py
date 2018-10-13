@@ -46,7 +46,7 @@ class FRVTImageIter(mx.io.DataIter):
         """
             data: [(B, 3, 112, 112), (B, 6)]
         """
-        combined_data = [mx.nd.zeros((self.batch_size, 3, 112, 112), dtype='int32'),
+        combined_data = [mx.nd.zeros((self.batch_size, 3, 112, 112), dtype='float32'),
                          mx.nd.zeros((self.batch_size, 6))]
 
         i = 0

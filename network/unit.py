@@ -47,8 +47,10 @@ def binary_cross_entropy(data, target):
     :param target: (B, C, 1, 1)
     :return: a scalar
     """
+    data = mx.sym.sigmoid(data)
     loss1 = mx.sym.broadcast_mul(target, mx.sym.log(data))
     loss2 = mx.sym.broadcast_mul(mx.sym.ones_like(target) - target, data)
+
     return -mx.sym.mean(loss1 + loss2)
 
 

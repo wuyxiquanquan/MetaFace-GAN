@@ -14,7 +14,8 @@ args = parse_args()
 np.set_printoptions(suppress=True)
 
 # --------- multicard ---------
-cvd = os.environ['GPU'].strip()
+# cvd = os.environ['GPU'].strip()
+cvd='0'
 args.ctx = []
 for i in range(len(cvd.split(','))):
     args.ctx.append(mx.gpu(i))
@@ -39,7 +40,8 @@ decoder.bind(data_shapes=[('decoder_real_vector', (args.batch_size, 512)), ('dec
              for_training=True, inputs_need_grad=False)
 decoder.init_params(initializer=mx.init.Xavier(),
                     allow_missing=True)
-decoder.init_optimizer(optimizer='adam',
+decoder.init_optimizer(kvstore='device',
+                       optimizer='adam',
                        optimizer_params={
                            'learning_rate': 1e-4,
                            'beta1': 0.5,
@@ -57,7 +59,8 @@ discri.bind(data_shapes=[('discri_image', (args.batch_size, 3, 112, 112)), ('dis
             for_training=True, inputs_need_grad=True)
 discri.init_params(initializer=mx.init.Xavier(),
                    allow_missing=True)
-discri.init_optimizer(optimizer='adam',
+discri.init_optimizer(kvstore='device',
+                      optimizer='adam',
                       optimizer_params={
                           'learning_rate': 1e-4,
                           'beta1': 0.5,
@@ -82,7 +85,8 @@ fr_module = mx.module.Module.load(args.fr_path.split(',')[0],int(args.fr_path.sp
                                   data_names=['data', ], label_names=None,
                                   context=args.ctx, )
 fr_module.bind([('data', (args.batch_size, 3, 112, 112))], None, for_training=True, inputs_need_grad=True)
-fr_module.init_optimizer(optimizer='adam',
+fr_module.init_optimizer(kvstore='device',
+                         optimizer='adam',
                          optimizer_params={
                              'learning_rate': 1e-4,
                              'beta1': 0.5,
@@ -97,6 +101,8 @@ for epoch in range(args.epoch):
     train_dataiter.reset()
     for cur_time, databatch in enumerate(tqdm(train_dataiter)):
         real_image, labels = databatch.data
+        # real_image = real_image * (1.0 / 256.0) - 0.5
+
         # print(labels.asnumpy())
         # time.sleep(1)
         # =================================================================================== #
@@ -104,9 +110,9 @@ for epoch in range(args.epoch):
         # =================================================================================== #
         # discriminator data preparing
         fr_module.forward(DataBatch([real_image], None), is_train=False)
-        real_vector = fr_module.get_outputs()[0]
+        real_vector = fr_module.get_outputs()[0].copy()
         decoder.forward(DataBatch([real_vector, labels[:, 0:4], labels[:, 4:6]], None), is_train=True)
-        fake_image = decoder.get_outputs()[0]
+        fake_image = decoder.get_outputs()[0].copy()
         discri_cls_label = label_broad(args.batch_size, labels[:, 0:4])
         discri_angle_label = labels[:, 4:6]
         # update
@@ -114,7 +120,7 @@ for epoch in range(args.epoch):
         discri.forward(
             DataBatch([fake_image, mx.nd.zeros((args.batch_size, 1)), discri_cls_label, discri_angle_label], None),
             is_train=True)
-        loss1 = discri.get_outputs()[0]
+        loss1 = discri.get_outputs()[0].copy()
         discri.backward()
         gradDiscri = [[grad.copyto(grad.context) for grad in grads] for grads in discri._exec_group.grad_arrays]
         # collect real's grad
@@ -134,10 +140,10 @@ for epoch in range(args.epoch):
         decoder_cls_label = labels[:, 0:4]
         decoder_angle_label = labels[:, 4:6]
         fr_module.forward(DataBatch([fake_image], None), is_train=True)
-        fake_vector = fr_module.get_outputs()[0]
+        fake_vector = fr_module.get_outputs()[0].copy()
         # loss_mdoule
         loss_module.forward(DataBatch([real_vector, fake_vector, real_image, fake_image], None), is_train=True)
-        loss2 = loss_module.get_outputs()[0]
+        loss2 = loss_module.get_outputs()[0].copy()
         loss_module.backward()
         backward_grad = loss_module.get_input_grads()
         #   fake_image
@@ -162,4 +168,7 @@ for epoch in range(args.epoch):
         #                                 3. Miscellaneous                                    #
         # =================================================================================== #
         loss = loss1 + loss2
-        # print(loss)
+
+
+
+        break

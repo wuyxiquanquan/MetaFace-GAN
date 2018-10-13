@@ -92,6 +92,7 @@ def QuanDiscr():
     # Loss 1 and Loss 3
     loss1 = binary_cross_entropy(out1, gan_label)
     loss3 = mae_loss(out2, angle_lable)
+
     # --------
     return mx.sym.MakeLoss(loss1 + loss2 + loss3, name='DLoss')
 
